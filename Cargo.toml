@@ -4,4 +4,33 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-iced = "0.13.1"
+env_logger = "0.11.5"
+#futures = "0.3.31"
+iced = { version = "0.13.1", features = [
+    "canvas", "tokio", "debug", "advanced", "image"
+] }
+log = "0.4.22"
+tokio = { version = "1.40.0", features = [
+    "io-util", "net", "sync", "macros"
+] }
+plotters = { version = "0.3", default-features = false, features = [
+    "chrono",
+    "area_series",
+    "line_series",
+    "point_series",
+] }
+plotters-iced = "0.11.0"
+rand = "0.8.5"
+
+[[bin]]
+name = "iced_app"
+path = "src/plotters_iced.rs"
+
+[[bin]]
+name = "pressure"
+path = "src/pressure_sender.rs"
+
+[profile.release]
+opt-level = 3  # Maximum optimization level
+lto = true     # Enable Link Time Optimization (LTO)
+overflow-checks = false
