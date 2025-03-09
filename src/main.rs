@@ -1,5 +1,5 @@
 mod counter_example;
-mod pressure_senders;
+mod stress_senders;
 
 use crate::counter_example::counter::Counter;
 
