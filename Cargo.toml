@@ -21,6 +21,7 @@ plotters = { version = "0.3", default-features = false, features = [
 ] }
 plotters-iced = "0.11.0"
 rand = "0.8.5"
+chrono = "0.4.40"
 
 [[bin]]
 name = "iced_app"
@@ -28,7 +29,7 @@ path = "src/plotters_iced.rs"
 
 [[bin]]
 name = "pressure"
-path = "src/pressure_sender.rs"
+path = "src/stress_senders.rs"
 
 [profile.release]
 opt-level = 3  # Maximum optimization level
