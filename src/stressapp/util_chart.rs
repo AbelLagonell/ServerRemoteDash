@@ -20,16 +20,15 @@ pub struct UtilChart {
 }
 
 impl UtilChart {
-    fn new(data: impl Iterator<Item = (DateTime<Utc>, f32)>) -> Self {
-        let data_points = data.collect();
+    pub fn new(data: (DateTime<Utc>, f32)) -> Self {
         Self {
             cache: Cache::new(),
-            data_points,
+            data_points: VecDeque::from([data]),
             limit: Duration::from_secs(PLOT_SECONDS as u64),
         }
     }
 
-    fn push_data(&mut self, time: DateTime<Utc>, percentage: f32) {
+    pub fn push_data(&mut self, time: DateTime<Utc>, percentage: f32) {
         let cur_ms = time.timestamp_millis();
         self.data_points.push_front((time, percentage));
         loop {
@@ -45,7 +44,7 @@ impl UtilChart {
         self.cache.clear();
     }
 
-    fn view(&self, title: String, chart_height: f32) -> Element<AppMessage> {
+    pub fn view(&self, title: String, chart_height: f32) -> Element<AppMessage> {
         Column::new()
             .width(Length::Fill)
             .height(Length::Fill)

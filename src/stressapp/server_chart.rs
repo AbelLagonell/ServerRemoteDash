@@ -3,10 +3,14 @@ use std::time::{Duration, Instant};
 use iced::{
     Alignment, Element, Length,
     alignment::{Horizontal, Vertical},
+    futures::stream::pending,
     widget::{Column, Scrollable, Text},
 };
 
-use super::{message::AppMessage, util_chart::UtilChart};
+use super::{
+    message::{AppMessage, BasicMessage},
+    util_chart::UtilChart,
+};
 
 const SAMPLE_EVERY: Duration = Duration::from_millis(1000);
 
@@ -14,9 +18,9 @@ pub struct ServerChart {
     //holds the various charts
     server: i8,
     last_sample_time: Instant,
-    items_per_row: usize,
-    util_charts: Vec<UtilChart>,
+    util_charts: Vec<(u8, UtilChart)>,
     chart_height: f32,
+    pending_messages: Vec<BasicMessage>,
 }
 
 impl Default for ServerChart {
@@ -24,9 +28,9 @@ impl Default for ServerChart {
         Self {
             server: -1,
             last_sample_time: Instant::now(),
-            items_per_row: 4,
             util_charts: Default::default(),
             chart_height: 300.0,
+            pending_messages: Default::default(),
         }
     }
 }
@@ -42,12 +46,28 @@ impl ServerChart {
         !self.is_initialized() || self.last_sample_time.elapsed() > SAMPLE_EVERY
     }
 
+    pub fn add_message(&mut self, basic_msg: BasicMessage) {
+        self.pending_messages.push(basic_msg);
+    }
+
     pub fn update(&mut self) {
         if !self.should_update() {
             return;
         }
 
         self.last_sample_time = Instant::now();
+
+        for msg in &self.pending_messages {
+            if self.util_charts.iter().any(|e| e.0 == msg.stress_tester) {
+                //Add Missing chart
+                let mut new_chart = UtilChart::new((msg.timestamp, msg.percentage));
+                self.util_charts
+                    .append(&mut vec![(msg.stress_tester, new_chart)]);
+            } else {
+                //Adds it to the util chart
+            }
+        }
+
         //Updates each utility chart based on message
     }
 
