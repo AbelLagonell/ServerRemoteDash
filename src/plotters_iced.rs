@@ -7,16 +7,10 @@ use iced::{
     widget::{Column, Container, Text},
 };
 use stressapp::message::AppMessage;
-use stressapp::server_chart::ServerChart;
-
-struct MonitorChart {
-    //holds the server charts
-    servers: Vec<ServerChart>,
-}
+use stressapp::monitor_chart::MonitorChart;
 
 struct State {
-    //Change this to be using MonitorChart
-    server_chart: ServerChart,
+    server_chart: MonitorChart,
 }
 
 impl State {
@@ -31,8 +25,9 @@ impl State {
 
     fn update(&mut self, message: AppMessage) {
         match message {
-            AppMessage::NewDataPoint(_basic_message) => {
+            AppMessage::NewDataPoint(basic_message) => {
                 //Update the servers here
+                self.server_chart.send_message(basic_message);
             }
             AppMessage::Tick => {
                 self.server_chart.update();

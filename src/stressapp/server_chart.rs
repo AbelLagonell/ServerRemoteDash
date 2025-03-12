@@ -1,10 +1,7 @@
-use std::time::{Duration, Instant};
-
 use iced::{
     Alignment, Element, Length,
     alignment::{Horizontal, Vertical},
-    futures::stream::pending,
-    widget::{Column, Scrollable, Text},
+    widget::{Row, Scrollable, Space, Text},
 };
 
 use super::{
@@ -12,12 +9,8 @@ use super::{
     util_chart::UtilChart,
 };
 
-const SAMPLE_EVERY: Duration = Duration::from_millis(1000);
-
 pub struct ServerChart {
     //holds the various charts
-    server: i8,
-    last_sample_time: Instant,
     util_charts: Vec<(u8, UtilChart)>,
     chart_height: f32,
     pending_messages: Vec<BasicMessage>,
@@ -26,8 +19,6 @@ pub struct ServerChart {
 impl Default for ServerChart {
     fn default() -> Self {
         Self {
-            server: -1,
-            last_sample_time: Instant::now(),
             util_charts: Default::default(),
             chart_height: 300.0,
             pending_messages: Default::default(),
@@ -43,7 +34,7 @@ impl ServerChart {
 
     #[inline]
     fn should_update(&self) -> bool {
-        !self.is_initialized() || self.last_sample_time.elapsed() > SAMPLE_EVERY
+        !self.is_initialized() || !self.pending_messages.is_empty()
     }
 
     pub fn add_message(&mut self, basic_msg: BasicMessage) {
@@ -55,20 +46,25 @@ impl ServerChart {
             return;
         }
 
-        self.last_sample_time = Instant::now();
-
         for msg in &self.pending_messages {
-            if self.util_charts.iter().any(|e| e.0 == msg.stress_tester) {
+            if !self.util_charts.iter().any(|e| e.0 == msg.stress_tester) {
                 //Add Missing chart
-                let mut new_chart = UtilChart::new((msg.timestamp, msg.percentage));
+                let new_chart = UtilChart::new((msg.timestamp, msg.percentage));
                 self.util_charts
                     .append(&mut vec![(msg.stress_tester, new_chart)]);
-            } else {
-                //Adds it to the util chart
             }
         }
 
         //Updates each utility chart based on message
+        for (stress, chart) in &mut self.util_charts {
+            for msg in &self.pending_messages {
+                if stress == &msg.stress_tester {
+                    chart.push_data(msg.timestamp, msg.percentage);
+                }
+            }
+        }
+
+        self.pending_messages.clear();
     }
 
     pub fn view(&self) -> Element<AppMessage> {
@@ -78,17 +74,31 @@ impl ServerChart {
                 .align_y(Vertical::Center)
                 .into()
         } else {
-            let mut _col = Column::new()
+            let chart_height = self.chart_height;
+            let mut title: &str;
+
+            let mut row = Row::new()
+                .spacing(15)
+                .padding(20)
                 .width(Length::Fill)
                 .height(Length::Shrink)
-                .align_x(Alignment::Center);
-
-            let _chart_height = self.chart_height;
-            let mut _title = "";
+                .align_y(Alignment::Center);
 
             //Add the UtilChart
+            for (stressor, chart) in &self.util_charts {
+                match stressor {
+                    0 => title = "cpu",
+                    1 => title = "ip",
+                    2 => title = "network",
+                    3 => title = "fs",
+                    4 => title = "memory",
+                    _ => title = "",
+                }
+                row = row.push(chart.view(title.to_string(), chart_height));
+                row = row.push(Space::new(Length::Fill, Length::Fixed(50.0)));
+            }
 
-            Scrollable::new(_col).height(Length::Shrink).into()
+            Scrollable::new(row).width(Length::Shrink).into()
         }
     }
 }
