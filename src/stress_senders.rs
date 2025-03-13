@@ -1,41 +1,84 @@
-use rand::Rng;
-use std::time::Duration;
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
+// SERVER CODE (server.rs)
+use std::io;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::TcpListener;
+
 #[tokio::main]
 async fn main() {
-	env_logger::init();
+	// Initialize logger with default level of INFO
+	env_logger::builder().filter_level(log::LevelFilter::Info).init();
+
 	let server_address = "127.0.0.1:7800";
-	log::info!("Start at {}", server_address);
-	loop {
-		// Attempt to connect to the TCP server
-		match TcpStream::connect(server_address).await {
-			Ok(mut stream) => {
-				log::info!("Connected to server at {}", server_address);
-				let mut rng = rand::thread_rng();
-				loop {
-					// Generate a random float
-					let random_float: f64 = rng.gen_range(5.0..9.0);
-					let random_string = random_float.to_string();
-					// Send the random float as a string over the TCP connection
-					if let Err(e) = stream.write_all(random_string.as_bytes()).await {
-						log::error!("Failed to send data: {}", e);
-						break;
+
+	// Create a TCP listener bound to the specified address
+	match TcpListener::bind(server_address).await {
+		Ok(listener) => {
+			println!("Server listening on {}", server_address);
+			log::info!("Server listening on {}", server_address);
+
+			loop {
+				// Accept incoming connection
+				match listener.accept().await {
+					Ok((mut socket, addr)) => {
+						println!("New client connected: {}", addr);
+						log::info!("New client connected: {}", addr);
+
+						// Spawn a new task to handle this client
+						tokio::spawn(async move {
+							let (reader, mut writer) = socket.split();
+							let mut reader = BufReader::new(reader);
+							let mut line = String::new();
+
+							// Read lines from the client
+							loop {
+								// Clear line before reading into it
+								line.clear();
+
+								match reader.read_line(&mut line).await {
+									Ok(0) => {
+										// EOF, client closed the connection
+										println!("Client {} disconnected", addr);
+										log::info!("Client {} disconnected", addr);
+										break;
+									},
+									Ok(_) => {
+										println!("Received: {}", line.trim());
+
+										// Process the received line
+										if let Ok(value) = line.trim().parse::<f64>() {
+											println!("Received value from {}: {}", addr, value);
+											log::info!("Received value from {}: {}", addr, value);
+
+											// Echo the value back to client if needed
+											if let Err(e) = writer.write_all(format!("Received: {}\n", value).as_bytes()).await {
+												println!("Failed to write to client: {}", e);
+												log::error!("Failed to write to client: {}", e);
+												break;
+											}
+										} else {
+											println!("Received invalid data from {}: {}", addr, line.trim());
+											log::warn!("Received invalid data from {}: {}", addr, line.trim());
+										}
+									},
+									Err(e) => {
+										println!("Error reading from client: {}", e);
+										log::error!("Error reading from client: {}", e);
+										break;
+									}
+								}
+							}
+						});
 					}
-					if let Err(e) = stream.write_all(b"\n").await {
-						log::error!("Failed to send newline: {}", e);
-						break;
+					Err(e) => {
+						println!("Failed to accept connection: {}", e);
+						log::error!("Failed to accept connection: {}", e);
 					}
-					log::info!("Sent: {}", random_string);
-					// Sleep for a short duration before sending the next value
-					tokio::time::sleep(Duration::from_secs(1)).await;
 				}
 			}
-			Err(e) => {
-				log::error!("Failed to connect to server: {}", e);
-			}
 		}
-		// Sleep and try later for the next connect
-		tokio::time::sleep(Duration::from_secs(10)).await;
+		Err(e) => {
+			println!("Failed to bind to address {}: {}", server_address, e);
+			log::error!("Failed to bind to address {}: {}", server_address, e);
+		}
 	}
 }
