@@ -28,7 +28,7 @@ name = "iced_app"
 path = "src/plotters_iced.rs"
 
 [[bin]]
-name = "pressure"
+name = "server"
 path = "src/stress_senders.rs"
 
 [profile.release]
