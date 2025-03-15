@@ -1,0 +1,11 @@
+[Unit]
+Description=Check if Website is Up
+
+[Service]
+Type=simple
+ExecStart=/opt/scripts/check_website.sh
+Restart=no
+RestartSec=15s
+
+[Install]
+WantedBy=multi-user.target
