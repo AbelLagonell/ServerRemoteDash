@@ -3,12 +3,109 @@ use rand::Rng;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
+use std::sync::{Arc, Mutex};
+use iced::{
+    Alignment, Element, Length, Task,
+    widget::{Column, Container, Text},
+};
 
-#[tokio::main]
-async fn main() {
+mod stressapp;
+use stressapp::message::AppMessage;
+use stressapp::monitor_chart::MonitorChart;
+
+// Shared data structure that's thread-safe
+struct SharedData {
+    received_data: Vec<String>,
+}
+
+struct State {
+    server_chart: MonitorChart,
+    shared_data: Arc<Mutex<SharedData>>,
+}
+
+impl State {
+    fn new(shared_data: Arc<Mutex<SharedData>>) -> (Self, Task<AppMessage>) {
+        (
+            Self {
+                server_chart: Default::default(),
+                shared_data,
+            },
+            Task::none(),
+        )
+    }
+
+    fn update(&mut self, message: AppMessage) {
+        match message {
+            AppMessage::NewDataPoint(basic_message) => {
+                // Update the servers here
+                self.server_chart.send_message(basic_message);
+            }
+            AppMessage::Tick => {
+                self.server_chart.update();
+
+                // Check for new data from TCP client
+                if let Ok(mut data) = self.shared_data.lock() {
+                    // Process any new data here
+                    // For example, you could convert data points and send them to the chart
+                    if !data.received_data.is_empty() {
+                        // Process data...
+                        data.received_data.clear();
+                    }
+                }
+            }
+        }
+    }
+
+    fn view(&self) -> Element<'_, AppMessage> {
+        let content = Column::new()
+            .spacing(20)
+            .align_x(Alignment::Start)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .push(Text::new("Server"))
+            .push(self.server_chart.view());
+
+        Container::new(content)
+            .padding(5)
+            .center_x(Length::Fill)
+            .center_y(Length::Fill)
+            .into()
+    }
+}
+
+fn main() {
     // Initialize logger with default level of INFO
     env_logger::builder().filter_level(log::LevelFilter::Info).init();
 
+    // Create shared data structure
+    let shared_data = Arc::new(Mutex::new(SharedData {
+        received_data: Vec::new(),
+    }));
+
+    // Clone for TCP client
+    let tcp_shared_data = Arc::clone(&shared_data);
+
+    // Start the TCP client in a separate OS thread
+    // This avoids Send trait issues with the Tokio runtime
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            run_tcp_client(tcp_shared_data).await;
+        });
+    });
+
+    // Run the Iced UI in the main thread
+    iced::application("CPU Monitor Example", State::update, State::view)
+        .antialiasing(true)
+        .subscription(|_| {
+            const FPS: u64 = 50;
+            iced::time::every(Duration::from_millis(1000 / FPS)).map(|_| AppMessage::Tick)
+        })
+        .run_with(|| State::new(shared_data))
+        .unwrap();
+}
+
+async fn run_tcp_client(shared_data: Arc<Mutex<SharedData>>) {
     let server_address = "127.0.0.1:7800";
     println!("Starting client, will connect to server at {}", server_address);
     log::info!("Starting client, will connect to server at {}", server_address);
@@ -24,6 +121,9 @@ async fn main() {
                 let mut reader = BufReader::new(reader);
                 let mut rng = rand::thread_rng();
 
+                // Clone shared data for reader task
+                let reader_shared_data = Arc::clone(&shared_data);
+
                 // Spawn a task to handle server responses
                 let read_handle = tokio::spawn(async move {
                     let mut line = String::new();
@@ -34,8 +134,18 @@ async fn main() {
                             log::info!("Server disconnected");
                             break;
                         }
-                        println!("Server response: {}", line.trim());
-                        log::info!("Server response: {}", line.trim());
+
+                        let response = line.trim().to_string();
+                        println!("Server response: {}", response);
+                        log::info!("Server response: {}", response);
+
+                        // Store the data in shared storage
+                        if let Ok(mut data) = reader_shared_data.lock() {
+                            data.received_data.push(response.clone());
+                        } else {
+                            log::error!("Failed to acquire lock for storing TCP data");
+                        }
+
                         line.clear();
                     }
                 });
@@ -78,72 +188,3 @@ async fn main() {
         tokio::time::sleep(Duration::from_secs(10)).await;
     }
 }
-
-
-
-/*mod stressapp;
-
-use std::time::Duration;
-
-use iced::{
-    Alignment, Element, Length, Task,
-    widget::{Column, Container, Text},
-};
-use stressapp::message::AppMessage;
-use stressapp::monitor_chart::MonitorChart;
-
-struct State {
-    server_chart: MonitorChart,
-}
-
-impl State {
-    fn new() -> (Self, Task<AppMessage>) {
-        (
-            Self {
-                server_chart: Default::default(),
-            },
-            Task::none(),
-        )
-    }
-
-    fn update(&mut self, message: AppMessage) {
-        match message {
-            AppMessage::NewDataPoint(basic_message) => {
-                //Update the servers here
-                self.server_chart.send_message(basic_message);
-            }
-            AppMessage::Tick => {
-                self.server_chart.update();
-            }
-        }
-    }
-
-    fn view(&self) -> Element<'_, AppMessage> {
-        let content = Column::new()
-            .spacing(20)
-            .align_x(Alignment::Start)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .push(Text::new("Server"))
-            .push(self.server_chart.view());
-
-        Container::new(content)
-            //.style(style::Container)
-            .padding(5)
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
-            .into()
-    }
-}
-
-fn main() {
-    iced::application("CPU Monitor Example", State::update, State::view)
-        .antialiasing(true)
-        .subscription(|_| {
-            const FPS: u64 = 50;
-            iced::time::every(Duration::from_millis(1000 / FPS)).map(|_| AppMessage::Tick)
-        })
-        .run_with(State::new)
-        .unwrap();
-}
-*/
