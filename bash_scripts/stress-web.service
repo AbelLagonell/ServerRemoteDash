@@ -1,11 +1,21 @@
 [Unit]
-Description=Check if Website is Up
+Description=System Stress Generator Service
+After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/scripts/check_website.sh
-Restart=no
-RestartSec=15s
+User=stressuser
+Group=stressgroup
+ExecStart=/usr/local/bin/system_monitor.sh
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/system-stress-stdout.log
+StandardError=append:/var/log/system-stress-stderr.log
+
+# Security hardening
+ProtectSystem=full
+PrivateTmp=true
+NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target
