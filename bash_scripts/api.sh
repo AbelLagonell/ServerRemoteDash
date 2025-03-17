@@ -27,7 +27,7 @@ collect_metrics() {
         echo "$METRIC"
 
         # Write the metrics to the pipe for other processes to read
-        echo "$METRIC" > "$PIPE" &
+        sudo echo "$METRIC" > "$PIPE" &
 
         # Write the metrics to the log file for history
         echo "$METRIC" >> "$LOG_FILE"
