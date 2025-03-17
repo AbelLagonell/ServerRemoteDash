@@ -1,9 +1,9 @@
 use iced::{
-    Alignment, Element, Length,
-    alignment::{Horizontal, Vertical},
-    widget::{Row, Scrollable, Space, Text},
+    alignment::{Horizontal, Vertical}, widget::{Row, Space, Text}, Alignment,
+    Element,
+    Length,
 };
-
+use crate::stressapp::message::parse_message;
 use super::{
     message::{AppMessage, BasicMessage},
     util_chart::UtilChart,
@@ -23,6 +23,7 @@ impl Default for ServerChart {
             chart_height: 300.0,
             pending_messages: Default::default(),
         }
+
     }
 }
 
@@ -98,7 +99,7 @@ impl ServerChart {
                 row = row.push(Space::new(Length::Fill, Length::Fixed(50.0)));
             }
 
-            Scrollable::new(row).width(Length::Shrink).into()
+            Element::new(row).into()
         }
     }
 }

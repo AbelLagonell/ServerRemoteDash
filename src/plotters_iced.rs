@@ -1,10 +1,5 @@
-use gui_connection::initialize_server;
-use iced::application::Update;
-use iced::Element;
-use iced::Subscription;
-use iced::Task;
-use std::thread;
 use std::time::Duration;
+use iced::{Element, Subscription, Task};
 use stressapp::message::AppMessage;
 use stressapp::monitor_chart::MonitorChart;
 
@@ -25,7 +20,11 @@ impl State {
         )
     }
 
-    fn update(&mut self, message: AppMessage) {
+    fn title(&self) -> String {
+        String::from("CPU Monitor Example")
+    }
+
+    fn update(&mut self, message: AppMessage){
         match message {
             AppMessage::NewDataPoint(basic_message) => {
                 //Update the servers here
@@ -63,32 +62,9 @@ impl State {
     }
 }
 
-fn main() -> iced::Result {
-    // Start the server and file writer
-    let server_address = "0.0.0.0:8888";
-
-    // Start the server in a new thread (server thread)
-    let (server_handle, file_writer_handle) = match initialize_server(server_address) {
-        Ok(handles) => handles,
-        Err(e) => {
-            eprintln!("Failed to initialize server: {}", e);
-            return Err(iced::Error::ExecutorCreationFailed(e));
-        }
-    };
-
-    // Run the Iced application
-    let app = iced::application("CPU Monitor Example", State::update, State::view)
+fn main()  {
+    iced::application("CPU Monitor Example", State::update, State::view)
         .antialiasing(true)
         .run_with(|| State::new())
-        .unwrap();
-
-    // Start the server thread and file writer
-    thread::spawn(move || {
-        server_handle.join().expect("Server thread panicked");
-    });
-    thread::spawn(move || {
-        file_writer_handle.join().expect("File writer thread panicked");
-    });
-
-    Ok(())
+        .unwrap()
 }

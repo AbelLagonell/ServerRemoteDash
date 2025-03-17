@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use iced::{
-    alignment::{Horizontal, Vertical}, widget::{Column, Scrollable, Space, Text}, Alignment,
+    alignment::{Horizontal, Vertical}, widget::{Column, Space, Text}, Alignment,
     Element,
     Length,
 };
@@ -25,11 +25,15 @@ pub struct MonitorChart {
 
 impl Default for MonitorChart {
     fn default() -> Self {
-        Self {
+        let mut test = Self {
             last_sample_time: Instant::now(),
             servers: Default::default(),
             directory: String::new() + "tcp_logs",
-        }
+        };
+
+        test.update();
+
+        return test;
     }
 }
 
@@ -48,7 +52,7 @@ impl MonitorChart {
         // Add any new server or update existing servers
         if !self.servers.iter().any(|e| e.0 == msg.stress_tester) {
             let new_server = ServerChart::default();
-            self.servers.push((msg.stress_tester, new_server));
+            self.servers.push((msg.server_id, new_server));
         }
 
         for (server_id, server) in &mut self.servers {
@@ -59,9 +63,7 @@ impl MonitorChart {
     }
 
     pub fn update(&mut self) {
-        if !self.should_update() {
-            return;
-        }
+        println!("Running");
 
         // Process files in the directory
         if let Err(e) = self.read_files_in_directory() {
@@ -91,7 +93,7 @@ impl MonitorChart {
                 col = col.push(Space::new(Length::Fixed(50.0), Length::Fill));
             }
 
-            Scrollable::new(col).height(Length::Shrink).into()
+            Element::new(col).into()
         }
     }
 
@@ -148,11 +150,13 @@ impl MonitorChart {
     fn read_files_in_directory(&mut self) -> io::Result<()> {
         // Read all files in the directory
         let entries = fs::read_dir(&self.directory)?;
+        println!("Reading files from directory: {}", self.directory);
 
         for entry in entries {
             let entry = entry?;
             let path = entry.path();
 
+            println!("Loading {}", path.display());
             // Check if it's a file and has a .txt extension
             if path.is_file() && path.extension() == Some("log".as_ref()) {
                 // Process the file
